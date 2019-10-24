@@ -101,7 +101,7 @@ class JobTask:
 
 
 @contextmanager
-def work(db, old_state, temp_state, done_state_or_func):
+def work(db, old_state, temp_state, done_state_or_func, fail_state = state.FAIL):
     """A context manager for acquiring a job temporarily in an
     exclusive way to work on it. Produce a `JobTask`.
     Done state can either be a valid state string or a function that
@@ -119,12 +119,17 @@ def work(db, old_state, temp_state, done_state_or_func):
         yield task
     except WorkError as exc:
         task.log(exc.message)
-        task.set_state(state.FAIL)
+        task.job['failed'] = True
+        task.set_state(fail_state)
     except Exception:
         task.log(traceback.format_exc())
-        task.set_state(state.FAIL)
+        task.job['failed'] = True
+        task.set_state(fail_state)
     else:
-        task.set_state(done_func(task))
+        if task.job.get('failed'):
+            task.set_state(state.FAIL)
+        else:
+            task.set_state(done_func(task))
 
 
 def task_config(task, config):

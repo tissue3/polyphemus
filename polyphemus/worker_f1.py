@@ -30,13 +30,12 @@ def rsync_cmd(src, dest, excludes=[]):
 
     return cmd
 
-def stage_f1_make(db, config):
-    """Make F1: Run make command on AWS F1. Done in four steps:
+def stage_f1_make_compile(db, config):
+    """Make F1 compile: Run make command on AWS F1. Done in four steps:
 
     1. Copy the code files to local work directory.
     2. Setup AWS tools.
     3. Run make command.
-    4. Copy the built files back to the instance directory.
 
     Assumes that at the end of the make command, work equivalent to the
     stage_hls is done, i.e., either estimation data has been generated or a
@@ -44,7 +43,7 @@ def stage_f1_make(db, config):
     """
 
     prefix = config["HLS_COMMAND_PREFIX"]
-    with work(db, state.MAKE, state.MAKE_PROGRESS, state.AFI_START) as task:
+    with work(db, state.MAKE, state.MAKE_COMPILE, state.COPY_START, state.COPY_START) as task:
         task_config(task, config)
 
         # Create a local working directory for the job.
@@ -58,49 +57,60 @@ def stage_f1_make(db, config):
             timeout=600,
         )
 
-        try:
-            # Get the AWS platform ID for F1 builds.
-            platform_script = (
-                'cd $AWS_FPGA_REPO_DIR; '
-                'source ./sdaccel_setup.sh > /dev/null; '
-                'echo $AWS_PLATFORM; '
-            )
-            proc = task.run([platform_script], capture=True, shell=True)
-            aws_platform = proc.stdout.decode('utf8').strip()
+        # Get the AWS platform ID for F1 builds.
+        platform_script = (
+        'cd $AWS_FPGA_REPO_DIR; '
+            'source ./sdaccel_setup.sh > /dev/null; '
+            'echo $AWS_PLATFORM; '
+        )        
+        proc = task.run([platform_script], capture=True, shell=True)
+        aws_platform = proc.stdout.decode('utf8').strip()
 
-            make = [
-                'make',
-                'MODE={}'.format(task['mode']),
-                'DEVICE={}'.format(aws_platform),
-            ]
+        make = [
+            'make',
+            'MODE={}'.format(task['mode']),
+            'DEVICE={}'.format(aws_platform),
+        ]
 
-            make_cmd = prefix + make
-            if task['config']['directives']:
-                make_cmd.append(
-                    'DIRECTIVES={}'.format(task['config']['directives'])
-                )
-
-            # Dry run the make command and extract relevant conf variables.
-            update_make_conf(make_cmd, task, db, config)
-
-            # Run the make target
-            task.run(
-                make_cmd,
-                timeout=config["SYNTHESIS_TIMEOUT"],
-                cwd=os.path.join(work_dir, CODE_DIR),
+        make_cmd = prefix + make
+        if task['config']['directives']:
+            make_cmd.append(
+                'DIRECTIVES={}'.format(task['config']['directives'])
             )
 
-        finally:
-            # Copy built files back to the job directory.
-            task.run(
-                rsync_cmd(work_dir, task.dir, EXCLUDED_RSYNC),
-                timeout=1200,
-                cwd=os.getcwd()
-            )
+        # Dry run the make command and extract relevant conf variables.
+        update_make_conf(make_cmd, task, db, config)
 
-            # Remove the local instance directory after make is done.
-            shutil.rmtree(work_dir)
+        # Run the make target
+        task.run(
+            make_cmd,
+            timeout=config["SYNTHESIS_TIMEOUT"],
+            cwd=os.path.join(work_dir, CODE_DIR),
+        )
+        
 
+def stage_f1_make_copy(db, config):
+    """Make F1 copy: command on AWS F1. Done in one step:
+
+    1. Copy the built files back to the instance directory.
+
+    """
+
+    prefix = config["HLS_COMMAND_PREFIX"]
+    with work(db, state.COPY_START, state.MAKE_COPY, state.AFI_START) as task:
+        task_config(task, config)
+
+        # Create a local working directory for the job.
+        work_dir = os.path.abspath(os.path.join(LOCAL_INSTANCE, task.job['name']))
+        os.makedirs(work_dir, exist_ok=True)
+        # Copy built files back to the job directory.
+        task.run(
+            rsync_cmd(work_dir, task.dir, EXCLUDED_RSYNC),
+            timeout=1200,
+            cwd=os.getcwd(),
+        )
+        # Remove the local instance directory after make is done.
+        shutil.rmtree(work_dir)
 
 def stage_afi(db, config):
     """Work stage: create the AWS FPGA binary and AFI from the *.xclbin

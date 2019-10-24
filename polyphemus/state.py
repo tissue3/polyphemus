@@ -7,9 +7,13 @@
 #         |
 #      <UNPACK>
 #         |
-#        MAKE
-#         |
-#   <MAKE_PROGRESS>-------------+
+#        MAKE-------------------+
+#         |                     |
+#         |               <MAKE_COMPILE> (F1 only)
+#         |                     |
+#         |                COPY_START (F1 only)
+#  <MAKE_PROGRESS>              |
+#         |               <MAKE_COPY> (F1 only)
 #         |                     |
 #         |                 AFI_START (F1 only)
 #         |                     |
@@ -28,6 +32,9 @@ UPLOAD = "uploaded"
 UNPACK = "unpacking"
 MAKE = "make"
 MAKE_PROGRESS = "makeing"
+MAKE_COMPILE = "make_compiling"
+COPY_START = "starting_compile"
+MAKE_COPY = "make_copying"
 HLS_FINISH = "hlsed"
 AFI_START = "starting_AFI"
 AFI = "generating_AFI"
@@ -35,4 +42,4 @@ RUN = "fpga_executing"
 DONE = "done"
 FAIL = "failed"
 
-UNLOCKED_STATES = MAKE, AFI_START, HLS_FINISH, DONE, FAIL
+UNLOCKED_STATES = MAKE, COPY_START, AFI_START, HLS_FINISH, DONE, FAIL

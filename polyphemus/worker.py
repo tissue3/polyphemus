@@ -10,13 +10,14 @@ from .worker_common import stage_unpack
 from . import state
 from .db import CODE_DIR
 
-from .worker_f1 import stage_f1_make, stage_afi, stage_f1_fpga_execute
+from .worker_f1 import stage_f1_make_compile, stage_f1_make_copy, stage_afi, stage_f1_fpga_execute
 from .worker_sdsoc import stage_sdsoc_make, stage_zynq_fpga_execute
 
 # Strings corresponding to stages known to workers.
 KNOWN_STAGES = {
     "unpack": stage_unpack,
-    "make_f1": stage_f1_make,
+    "make_compile_f1": stage_f1_make_compile,
+    "make_copy_f1": stage_f1_make_copy,
     "make_sdsoc": stage_sdsoc_make,
     "afi": stage_afi,
     "exec_f1": stage_f1_fpga_execute,
@@ -43,14 +44,13 @@ class WorkThread(threading.Thread):
         while True:
             self.func(self.db, self.config)
 
-
 def default_work_stages(config):
     """List of functions for the configured toolchain.
     """
 
     # Toolchain dependent stage configuration
-    stage_make = stage_f1_make if config['TOOLCHAIN'] == 'f1' else stage_sdsoc_make
-    stages = [stage_unpack, stage_make]
+    stages = [stage_unpack] 
+    stages += [stage_f1_make_compile, stage_f1_make_copy] if config['TOOLCHAIN'] == 'f1' else [stage_sdsoc_make]
 
     if config['TOOLCHAIN'] == 'f1':
         stages += stage_afi, stage_f1_fpga_execute

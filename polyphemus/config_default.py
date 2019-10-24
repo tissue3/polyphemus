@@ -16,11 +16,11 @@ HLS_COMMAND_PREFIX = []
 # Spawn threads inside the server process for the workers (instead of
 # using a separate worker process). The default (None) means True in the
 # development environment and False in production.
-WORKER_THREADS = None
+WORKER_THREADS = False
 
 # Assume the workers are using continous polling instead of socket-based
 # communication
-POLL_MODE = False
+POLL_MODE = True #False
 
 # The number of jobs to process in parallel in the "make" stage (which is the
 # expensive, long-running one).
